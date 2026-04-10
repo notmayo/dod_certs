@@ -37,6 +37,7 @@ ROOTS_ONLY=0
 IMPORT_FIREFOX=1
 ENABLE_FIREFOX_POLICY=1
 QUIET=0
+BUNDLE_SELECT=""   # empty = interactive menu; "all" or "1,3,5" = non-interactive
 
 # ── Logging ────────────────────────────────────────────────────────────────────
 
@@ -51,6 +52,10 @@ usage() {
 Usage: dod_certs.sh [options]
 
 Options:
+  --bundles <list>          Comma-separated bundle numbers, or "all"
+                            1=Root  2=Intermediates  3=ECA  4=JITC
+                            5=WCF   6=Federal        7=Non-federal  8=Foreign
+                            Example: --bundles 1,2  or  --bundles all
   --roots-only              Keep only self-signed roots before installing/importing
   --no-firefox              Skip Firefox profile import
   --no-firefox-policy       Do not create Firefox enterprise roots policy
@@ -63,7 +68,8 @@ EOF
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --roots-only)        ROOTS_ONLY=1;           shift ;;
+    --bundles)           BUNDLE_SELECT="$2";      shift 2 ;;
+    --roots-only)        ROOTS_ONLY=1;            shift ;;
     --no-firefox)        IMPORT_FIREFOX=0;        shift ;;
     --no-firefox-policy) ENABLE_FIREFOX_POLICY=0; shift ;;
     -q|--quiet)          QUIET=1;                 shift ;;
@@ -78,6 +84,32 @@ select_bundles() {
   local n=${#BUNDLE_LABELS[@]}
   local -a sel
   for (( i=0; i<n; i++ )); do sel[i]=1; done   # default: all selected
+
+  # --bundles flag: skip the menu entirely and use the specified selection.
+  if [[ -n "$BUNDLE_SELECT" ]]; then
+    ZIP_URLS=()
+    ZIP_LABELS=()
+    if [[ "$BUNDLE_SELECT" == "all" ]]; then
+      ZIP_URLS=("${BUNDLE_URLS[@]}")
+      ZIP_LABELS=("${BUNDLE_LABELS[@]}")
+    else
+      local token idx
+      IFS=',' read -ra tokens <<< "$BUNDLE_SELECT"
+      for token in "${tokens[@]}"; do
+        token="${token// /}"   # strip any spaces
+        [[ "$token" =~ ^[1-8]$ ]] \
+          || die "Invalid bundle number '$token' in --bundles. Valid range: 1-8."
+        idx=$(( token - 1 ))
+        ZIP_URLS+=("${BUNDLE_URLS[idx]}")
+        ZIP_LABELS+=("${BUNDLE_LABELS[idx]}")
+      done
+    fi
+    (( ${#ZIP_URLS[@]} > 0 )) || die "No bundles selected — nothing to do."
+    log "Selected ${#ZIP_URLS[@]} bundle(s):"
+    for label in "${ZIP_LABELS[@]}"; do log "  • $label"; done
+    echo ""
+    return 0
+  fi
 
   # Non-interactive or quiet → silently use all bundles.
   if [[ "$QUIET" -eq 1 ]] || [[ ! -t 0 ]]; then
