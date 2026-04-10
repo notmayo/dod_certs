@@ -4,23 +4,24 @@ Installs U.S. Department of Defense (DoD)/Department of War (DoW)  and affiliate
 
 ## Quick Start
 
+**1. Open a terminal.**
+
+- **macOS:** Press `⌘ Space`, type `Terminal`, and press Enter. Or go to Applications → Utilities → Terminal.
+- **Linux (GNOME/KDE/most desktops):** Press `Ctrl+Alt+T`, or search for "Terminal" in your application menu.
+
+**2. Copy and paste this command, then press Enter:**
+
 ```bash
 curl -fsSL https://raw.githubusercontent.com/notmayo/dod_certs/main/dod_certs.sh | sudo bash
 ```
 
-An interactive menu lets you choose which certificate bundles to install. Press **Enter** to install all of them (recommended).
+You will be asked for your password — this is your normal login password. Nothing will be shown as you type it; that is normal.
 
-> **Note:** `sudo` is required to write to the system certificate store. On macOS, you will be prompted by the OS rather than needing to prefix with `sudo`.
+**3. Follow the on-screen menu** to choose which certificate bundles to install. If you are unsure, just press **Enter** to install all of them (recommended).
 
-### Options
+> **macOS note:** You may see a system prompt asking for your password rather than a terminal prompt. This is normal — the script needs administrator access to modify the System Keychain.
 
-| Flag | Description |
-|---|---|
-| `--roots-only` | Install only self-signed root certificates, skip intermediates |
-| `--no-firefox` | Skip Firefox profile import |
-| `--no-firefox-policy` | Do not write the Firefox enterprise roots policy |
-| `-q, --quiet` | Suppress informational output |
-| `-h, --help` | Show help |
+That's it — you're done.
 
 ---
 
@@ -68,7 +69,55 @@ The following systems have immutable root filesystems that prevent persistent ch
 
 ---
 
+## Advanced Users
+
+The script accepts flags to customise its behaviour. Append them after a `--` when using the curl one-liner:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/notmayo/dod_certs/main/dod_certs.sh | sudo bash -s -- --no-firefox
+```
+
+| Flag | Description |
+|---|---|
+| `--bundles <list>` | Install specific bundles without the menu (see [Certificate Bundles](#certificate-bundles)). Example: `--bundles 1,2` or `--bundles all` |
+| `--roots-only` | Install only self-signed root certificates, skip intermediates |
+| `--no-firefox` | Skip Firefox profile import |
+| `--no-firefox-policy` | Do not write the Firefox enterprise roots policy |
+| `-q, --quiet` | Suppress informational output (implies `--bundles all`) |
+| `-h, --help` | Show help |
+
+---
+
 ## For Sysadmins
+
+### Selecting Specific Bundles (Non-interactive)
+
+By default the script shows an interactive menu. In automated or headless environments, use `--bundles` to skip the menu entirely:
+
+```bash
+# Roots and intermediates only — minimal trust chain
+curl -fsSL https://raw.githubusercontent.com/notmayo/dod_certs/main/dod_certs.sh \
+  | sudo bash -s -- --bundles 1,2
+
+# Everything, no prompts
+curl -fsSL https://raw.githubusercontent.com/notmayo/dod_certs/main/dod_certs.sh \
+  | sudo bash -s -- --bundles all --quiet
+
+# Common federal/contractor setup: roots + intermediates + ECA + federal agencies
+curl -fsSL https://raw.githubusercontent.com/notmayo/dod_certs/main/dod_certs.sh \
+  | sudo bash -s -- --bundles 1,2,3,6
+```
+
+| Number | Bundle |
+|---|---|
+| 1 | Root |
+| 2 | Intermediate Trusts |
+| 3 | ECA (External Certification Authority) |
+| 4 | JITC (Joint Interoperability Test Command) |
+| 5 | WCF (Web Content Filtering) |
+| 6 | Federal Agencies (Types 1–2) |
+| 7 | Non-federal Issuers (Types 3–4) |
+| 8 | Foreign / Allied / Coalition (Types 5–6) |
 
 ### Container Images
 
@@ -96,8 +145,8 @@ Example — building a custom Debian image with DoD certs baked in:
 ```dockerfile
 FROM debian:latest
 RUN apt-get update && apt-get install -y curl sudo ca-certificates
-RUN curl -fsSL https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/dod_certs.sh \
-    | sudo bash -s -- --quiet --no-firefox --no-firefox-policy
+RUN curl -fsSL https://raw.githubusercontent.com/notmayo/dod_certs/main/dod_certs.sh \
+    | bash -s -- --bundles 1,2 --quiet --no-firefox --no-firefox-policy
 ```
 
 ### Cloud Provider Images
